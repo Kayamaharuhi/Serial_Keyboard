@@ -2,46 +2,58 @@
 #include "usart.h"
 #include "Keylistener.hpp"
 #include <cstdio>
-#include "DigitalOut.hpp" 
+#include "DigitalOut.hpp"
 #include "Timer.hpp"
 #include "Config.hpp"
 
 int cpp_main()
 {
+
     main_timer::activate();
-    cycle::dt = 0.05f;
+    cycle::dt = 0.01f;
 
     Timer timer;
     float elapsed_time = 0.0f;
     timer.reset();
     timer.start();
 
+
     DigitalOut led(GPIOB, GPIO_PIN_15);
 
-    // 1. UART受信マネージャを作成
     SerialKeyManager key_mgr(&hlpuart1);
 
-    // 2. 監視したい各キーリスナーを作成して登録
-    KeyListener key('a');
-    KeyListener key1('s');
-    key_mgr.register_listener(&key);
-    key_mgr.register_listener(&key1);
+    KeyListener key_a('a'); 
+
+    KeyStickAxis stick_pitch('w', 's', 8 /* 変化速度 */, true /* 自動で0復帰 */);
+
+
+    key_mgr.register_listener(&key_a);
+    key_mgr.register_axis(&stick_pitch);
 
     while (true)
     {
-        // シリアル受信をまとめてチェック＆各キーへ振り分け
         key_mgr.poll();
 
-        if (key.pressed())
+        if (key_a.pressed())
         {
-            led.turn_on();
-            printf("on\n");
+            if (key_a.is_toggled()) {
+                led.turn_on();
+                printf("Key 'a' [ON]\r\n");
+            } else {
+                led.turn_off();
+                printf("Key 'a' [OFF]\r\n");
+            }
         }
-        else if (key1.pressed())
-        {
-            led.turn_off();
-            printf("off\n");
+
+
+        int16_t pitch = stick_pitch.get_value();
+        static int16_t prev_pitch = 0;
+        if (pitch != prev_pitch) {
+            printf("Stick : %+4d / 256\r\n", pitch);
+            prev_pitch = pitch;
         }
+
+        key_mgr.tick(10);
 
         while(timer.read() - elapsed_time < cycle::dt){};
         elapsed_time = timer.read();
